@@ -39,7 +39,6 @@ def get_topics(df, num_topics, rd:str=None, max_df:float=0.95, min_df:int=3, ret
            with too high document
            frequency.
      - min_df: TfidataVectorizer min freq count
-
   Returns:
     W: np.array, the document-topic matrix
     H: np.array, the topic-term matrix
@@ -74,17 +73,67 @@ def get_topics(df, num_topics, rd:str=None, max_df:float=0.95, min_df:int=3, ret
 
   return W, H, data, vectorizer.vocabulary_
 
-
 def get_difficulty(df):
   """
   Get difficulty for each value group.
   Arguments:
     - df: jeopardy question data
+  Returns:
+    - data: pd.DataFrame, df with a 
+            difficulty column
   """
   data = df.copy()
   data.loc[:, 'difficulty'] = data.groupby(['show_number']).rank(method='dense')['value']
   return data
 
+def get_relevancies(df, num_topics=25, top_topics=3):
+  """
+  Given df with difficulty scores, find the top
+  'num_topics' topics for each difficulty and
+  the relevant terms in those topics.
+  Arguments:
+    - df: DataFrame, must have 'difficulty' 
+          column
+    - num_topics: the number of top most common
+                  topics to look at
+  Returns:
+    - results: dict, attributes:
+      - 'W': document-topic matrix
+      - 'H': topic-term matrix
+      - 'data': df with difficulty and topic columns
+      - 'relevant_words': sorted word relevancy
+      - 'top3': word relevancies for the top3 most
+                most common topics
+  """
+  results = {}
+
+  for difficulty in df['difficulty'].unique():
+    print(f'{difficulty}: Computing topics...')
+    W, H, data, vocab = get_topics(df.loc[df['difficulty'] == difficulty], num_topics)
+    idx2word = {idx: word for word, idx in vocab.items()}
+
+    print(f'{difficulty}: Finding word relevancies...')
+    sorted_term_relevancy = np.apply_along_axis(np.argsort, axis=1, arr=-H)
+    word_relevancy = [list(map(idx2word.get, topic)) for topic in sorted_term_relevancy]
+
+    print(f'{difficulty}: Finding top 3 most common topics...')
+    topics = np.argsort(
+      data.groupby('topic').count()['value']  # 'value' is arbitrary column
+    )
+
+    top3 = []
+    for topic in topics[:min(num_topics, top_topics)]:
+      top3.append(word_relevancy[topic])
+
+    results[difficulty] = {
+        'W': W,
+        'H': H,
+        'data': data,
+        'relevant_words': word_relevancy,
+        'top3': top3
+    }
+
+  return results
 
 def prep_data(df):
   "Function to prep data"

@@ -91,7 +91,7 @@ def get_difficulty(df):
   return data
 
 
-def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbos=True):
+def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=True):
   """
   Given df with column, find the top
   'num_topics' topics for each unique column value and

@@ -18,7 +18,8 @@ from gensim.models import Word2Vec
 from gensim.similarities.annoy import AnnoyIndexer
 
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.decomposition import NMF, LatentDirichletAllocation 
+from sklearn.decomposition import NMF, LatentDirichletAllocation
+from sklearn.metrics import jaccard_score
 
 
 # preload dataframe
@@ -110,7 +111,7 @@ def get_relevancies(df, num_topics=25, top_topics=3):
   """
   results = {}
 
-  for difficulty in df['difficulty'].unique():
+  for difficulty in range(1,7):
     print(f'{difficulty}: Computing topics...')
     W, H, data, vocab = get_topics(df.loc[df['difficulty'] == difficulty], num_topics)
     idx2word = {idx: word for word, idx in vocab.items()}
@@ -125,7 +126,8 @@ def get_relevancies(df, num_topics=25, top_topics=3):
     )
 
     top3 = []
-    for topic in topics[:min(num_topics, top_topics)]:
+    max_length = min(num_topics, top_topics)
+    for topic in topics[:max_length]:
       top3.append(word_relevancy[topic])
 
     results[difficulty] = {
@@ -133,7 +135,7 @@ def get_relevancies(df, num_topics=25, top_topics=3):
         'H': H,
         'data': data,
         'relevant_words': word_relevancy,
-        'top3': top3
+        f'top{max_length}': top3
     }
 
   return results
@@ -218,8 +220,70 @@ def generate_wc(word_freqs):
     wc.generate_from_frequencies(word_freqs)
     return wc
 
+def compute_similarities(J, D, max_elements, normalize=True):
+  """
+  Computes the mean_max_Jaccard similarity between
+  every group in J to every element in D. 
+  Arguments:
+    - J: First set, (J is for Jeopardy!)
+    - D: Second set, (D is for Double Jeopardy!)
+    - max_elements: passed to mean_max_Jaccard
+  Returns:
+    - sim_matrix: np.array[np.array] which is 
+                  |J| x |D| and sim_matrix[i, j]
+                  is the mean_max_Jaccard
+                  between J[i] and D[j]
+  """
+  sim_matrix = np.zeros([len(J), len(D)])
 
-# for debugging
+  for j, set_j in enumerate(J):
+    for d, set_d in enumerate(D):
+      sim_matrix[j, d] = mean_max_Jaccard(
+        set_j, set_d, max_elements
+      )
+
+  if normalize:
+    # min-max scaling
+    sim_matrix = (sim_matrix - sim_matrix.min()) / (sim_matrix.max() - sim_matrix.min())
+  sim_matrix = np.round(sim_matrix, 4)
+  Jaccard_df = pd.DataFrame(sim_matrix, columns=range(1, len(D)+1), index=range(1, len(J)+1))
+
+  return Jaccard_df
+
+def mean_max_Jaccard(A, B, max_elements=None) -> int:
+  """
+  Computes the mean of the max Jaccard
+  similarities between each set in A and any other
+  set in B. In this case, A and B are made up of many
+  subsets, for example, A and B are lists of lists 
+  where each sublist is a sorted set of relevant terms
+  in a topic where A is $200 questions in Jeopardy!
+  round and B is $400 questions in Double Jeopardy.
+  Arguments:
+    - A: An iterable where elements are iterables 
+    - B: Same for A
+    - max_elements: The maximum number of elements
+                    to consider
+  Returns:
+    - similarity: int, single value representing the
+                  mean similarity scores of the max
+                  similarity between each topic and A
+                  and any topic in B.
+  """
+  topic_scores = []
+  for a in A:
+    jaccard_a_B = []  # the ith element is jaccard_score between a and Bi
+    for b in B:
+      # the num of words is different for each topic
+      min_set_size = min(len(a), len(b))
+      if max_elements is not None:
+        max_elements = min(min_set_size, max_elements)
+
+      jaccard_a_B.append(jaccard_score(a[:max_elements], b[:max_elements], average='macro'))
+    topic_scores.append(np.log(np.max(jaccard_a_B)+1e-8))  # log for comparison, prevent log(0)
+
+  return np.mean(topic_scores)
+
 if __name__ == '__main__':
   # df = pd.read_json('JEOPARDY_QUESTIONS1.json')
   # get_topics(df, 25)

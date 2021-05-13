@@ -20,7 +20,7 @@ from sklearn.decomposition import NMF, LatentDirichletAllocation
 # preload dataframe
 df = pd.read_json("JEOPARDY_QUESTIONS1.json")
 
-def get_topics(df, num_topics, rd:str=None, max_df:float=0.95):
+def get_topics(df, num_topics, rd:str=None, max_df:float=0.95, min_df:int=3):
 	"""
 	Finds all topics for the 'question'
 	column of data for the specified round.
@@ -36,6 +36,8 @@ def get_topics(df, num_topics, rd:str=None, max_df:float=0.95):
 					 cutoff point to exclude terms
 					 with too high document
 					 frequency.
+     - min_df: TfidataVectorizer min freq count
+
 	Returns:
 		W: np.array, the document-topic matrix
 		H: np.array, the topic-term matrix
@@ -52,7 +54,8 @@ def get_topics(df, num_topics, rd:str=None, max_df:float=0.95):
 	vectorizer = TfidfVectorizer(
 		strip_accents='ascii',
 		stop_words='english',
-		max_df=max_df
+		max_df=max_df,
+    min_df=min_df
 	)
 	tfidf_matrix = vectorizer.fit_transform(data['question'])
 
@@ -61,7 +64,7 @@ def get_topics(df, num_topics, rd:str=None, max_df:float=0.95):
 	W = model.fit_transform(tfidf_matrix)
 	H = model.components_
 
-	topics = np.apply_along_axis(np.argmax, axis=1, arr=W)
+	topics = np.argmax(W, axis=1)
 	data.loc[:, 'topic'] = topics
 
 	return W, H, data, vectorizer.vocabulary_

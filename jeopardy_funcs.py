@@ -116,7 +116,7 @@ def get_relevancies(df, num_topics=25, top_topics=3):
     idx2word = {idx: word for word, idx in vocab.items()}
 
     print(f'{difficulty}: Finding word relevancies...')
-    sorted_term_relevancy = np.apply_along_axis(np.argsort, axis=1, arr=-H)
+    sorted_term_relevancy = np.argsort(-H, axis=1)
     word_relevancy = [list(map(idx2word.get, topic)) for topic in sorted_term_relevancy]
 
     print(f'{difficulty}: Finding top 3 most common topics...')

@@ -48,13 +48,6 @@ def get_topics(df, num_topics, rd:str=None, max_df:float=0.95):
 	else:
 		data = df.copy()
 
-	# data prep
-	data.fillna(0)  # for missing question values
-	# convert value from $500 -> 500.0
-	data.loc[:, 'value'] = data['value'].str[1:].str.replace(',','').astype(np.float32)
-	data.loc[:, 'air_date'] = pd.to_datetime(data.loc[:, 'air_date'])
-	data.loc[:, 'year'] = data.loc[:, 'air_date'].dt.year
-
 	# tfidf
 	vectorizer = TfidfVectorizer(
 		strip_accents='ascii',
@@ -73,11 +66,27 @@ def get_topics(df, num_topics, rd:str=None, max_df:float=0.95):
 
 	return W, H, data, vectorizer.vocabulary_
 
-def get_difficulty(df, rd: str):
+def get_difficulty(df):
 	"""
 	Get difficulty for each value group.
+	Arguments:
+		- df: jeopardy question data
 	"""
-	pass
+	data = df.copy()
+	data.loc[:, 'difficulty'] = data.groupby(['show_number']).rank(method='dense')['value']
+	return data
+
+def prep_data(df):
+	"Function to prep data"
+	data = df.copy()
+
+	data.fillna(0)  # for missing question values
+	# convert value from $500 -> 500.0
+	data.loc[:, 'value'] = data['value'].str[1:].str.replace(',','').astype(np.float32)
+	data.loc[:, 'air_date'] = pd.to_datetime(data.loc[:, 'air_date'])
+	data.loc[:, 'year'] = data.loc[:, 'air_date'].dt.year
+
+	return data
 
 def w2v(df):
     categories = set([i.lower() for i in df['category']])

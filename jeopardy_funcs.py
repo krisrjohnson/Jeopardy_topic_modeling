@@ -2,6 +2,7 @@
 Script containing all helper and 
 plotting functions use in report
 """
+import sys
 import numpy as np
 import pandas as pd
 import json
@@ -10,6 +11,7 @@ import nltk
 import re
 import time
 from collections import Counter, defaultdict
+from wordcloud import WordCloud
 
 from nltk.corpus import stopwords
 from gensim.models import Word2Vec
@@ -21,6 +23,7 @@ from sklearn.decomposition import NMF, LatentDirichletAllocation
 
 # preload dataframe
 df = pd.read_json("JEOPARDY_QUESTIONS1.json")
+
 
 def get_topics(df, num_topics, rd:str=None, max_df:float=0.95, min_df:int=3, ret_tfidf=False):
   """
@@ -157,12 +160,21 @@ def get_topic_word_counts(df, vocab, tfidf_matrix, verbose=False):
     return topic_counts
 
 
+def generate_wc(word_freqs):
+    '''given a dictionary of words and their counts, generate and plot a wordcloud'''
+    wc = WordCloud(width=600, height=600,
+               background_color='white',
+               #stopwords=set(STOPWORDS),
+               min_font_size=10)
+    wc.generate_from_frequencies(word_freqs)
+    return wc
+
+
 # for debugging
 if __name__ == '__main__':
   # df = pd.read_json('JEOPARDY_QUESTIONS1.json')
   # get_topics(df, 25)
   pass
-
 
 
 

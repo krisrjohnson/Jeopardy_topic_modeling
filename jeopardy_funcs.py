@@ -114,7 +114,12 @@ def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=T
     """
     results = {}
 
-    for col_val in df[col].unique():
+      if col == 'difficulty':
+        groups = range(1,7)
+      else:
+        groups = df[col].unique()
+
+    for col_val in groups:
         if verbose:
             print(f'col: {col}, val: {col_val}: Computing topics...')
         W, H, data, vocab = get_topics(df.loc[df[col] == col_val], num_topics)

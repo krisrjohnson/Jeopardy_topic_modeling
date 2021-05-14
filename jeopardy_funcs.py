@@ -77,7 +77,6 @@ def get_topics(df, num_topics, rd: str = None, max_df: float = 0.95, min_df: int
 
     return W, H, data, vectorizer.vocabulary_
 
-
 def get_difficulty(df):
     """
     Get difficulty for each value group.
@@ -93,7 +92,7 @@ def get_difficulty(df):
     return data
 
 
-def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=True):
+def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=True, max_df=0.95, min_df=3):
     """
     Given df with column, find the top
     'num_topics' topics for each unique column value and
@@ -122,7 +121,7 @@ def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=T
     for col_val in groups:
         if verbose:
             print(f'col: {col}, val: {col_val}: Computing topics...')
-        W, H, data, vocab = get_topics(df.loc[df[col] == col_val], num_topics)
+        W, H, data, vocab = get_topics(df.loc[df[col] == col_val], num_topics, max_df=max_df, min_df=min_df)
         idx2word = {idx: word for word, idx in vocab.items()}
 
         if verbose:
@@ -298,19 +297,52 @@ def mean_max_Jaccard(A, B, max_elements=None) -> int:
             if max_elements is not None:
                 max_elements = min(min_set_size, max_elements)
 
-            jaccard_a_B.append(jacc_sim(a[:max_elements], b[:max_elements]))
+            jaccard_a_B.append(jaccard_score(
+              a[:max_elements], b[:max_elements], average='macro'))
         # log for comparison, prevent log(0)
         topic_scores.append(np.log(np.max(jaccard_a_B)+1e-8))
 
     return np.mean(topic_scores)
 
-def jacc_sim(A, B):
-    intersect = len(set(A).intersection(set(B)))
-    unioned = len(set(A)) + len(set(B)) - intersect
-    return float(unioned / interesect)
+def plot_Jaccard_matrix(Jaccard_matrix, threshold=0.7):
+    """
+    Function to plot the strength of connections
+    between the groups represented by the 
+    Jaccard matrix.
 
+    """
+    fig, ax = plt.subplots(figsize=(8, 10))
+
+    ax.set_xlim(-0.1,1.1)
+    ax.set_ylim(.5, 6.8)
+
+    ax.scatter(np.zeros(6), range(1,7), s=500, c='red', label='Jeopardy!', zorder=10)
+    ax.scatter(np.ones(6), range(1,7), s=500, c='blue', label='Double Jeopardy', zorder=10)
+    ax.legend()
+
+    for J_difficulty in Jaccard_matrix.columns:
+        for DBL_difficulty in Jaccard_matrix.index:
+            if Jaccard_matrix.loc[J_difficulty, DBL_difficulty] > threshold:
+                ax.plot(
+                    [0, 1], [J_difficulty, DBL_difficulty],
+                    lw=8, alpha=0.7,
+                    c='black'
+                )
+
+    ax.set_title("Similarity between Jeopardy! and Double Jeopardy! topics", fontsize=18)
+    for spine in ax.spines:
+        ax.spines[spine].set_visible(False)
+
+    ax.set_xticks([0,1])
+    ax.set_yticks([1,2,3,4,5,6])
+    ax.tick_params('both', width=0, labelsize=18)
+    ax.set_xlabel('Round', fontsize=15)
+    ax.set_ylabel('Difficulty of Questions', fontsize=15)
+
+    plt.show()
 
 if __name__ == '__main__':
     # df = pd.read_json('JEOPARDY_QUESTIONS1.json')
     # get_topics(df, 25)
     pass
+

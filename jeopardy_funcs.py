@@ -138,21 +138,20 @@ def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=T
             data.groupby('topic').count()['value']
         )
 
-        top3 = []
+        top = []
         max_length = min(num_topics, top_topics)
         for topic in topics[:max_length]:
-            top3.append(word_relevancy[topic])
+            top.append(word_relevancy[topic])
 
         results[col_val] = {
             'W': W,
             'H': H,
             'data': data,
             'relevant_words': word_relevancy,
-            'top3': top3
+            'top': top
         }
 
     return results
-
 
 def prep_data(df):
     "Function to prep data"
@@ -160,8 +159,7 @@ def prep_data(df):
 
     data.fillna(0)  # for missing question values
     # convert value from $500 -> 500.0
-    data.loc[:, 'value'] = data['value'].str[1:].str.replace(
-        ',', '').astype(np.float32)
+    data.loc[:, 'value'] = data['value'].str[1:].str.replace(',', '').astype(np.float32)
     data.loc[:, 'air_date'] = pd.to_datetime(data.loc[:, 'air_date'])
     data.loc[:, 'year'] = data.loc[:, 'air_date'].dt.year
 
@@ -300,12 +298,16 @@ def mean_max_Jaccard(A, B, max_elements=None) -> int:
             if max_elements is not None:
                 max_elements = min(min_set_size, max_elements)
 
-            jaccard_a_B.append(jaccard_score(
-                a[:max_elements], b[:max_elements], average='macro'))
+            jaccard_a_B.append(jacc_sim(a[:max_elements], b[:max_elements]))
         # log for comparison, prevent log(0)
         topic_scores.append(np.log(np.max(jaccard_a_B)+1e-8))
 
     return np.mean(topic_scores)
+
+def jacc_sim(A, B):
+    intersect = len(set(A).intersection(set(B)))
+    unioned = len(set(A)) + len(set(B)) - intersect
+    return float(unioned / interesect)
 
 
 if __name__ == '__main__':

@@ -114,10 +114,10 @@ def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=T
     """
     results = {}
 
-      if col == 'difficulty':
-        groups = range(1,7)
-      else:
-        groups = df[col].unique()
+    if col == 'difficulty':
+      groups = range(1,7)
+    else:
+      groups = df[col].unique()
 
     for col_val in groups:
         if verbose:

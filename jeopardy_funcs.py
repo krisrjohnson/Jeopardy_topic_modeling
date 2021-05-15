@@ -15,6 +15,7 @@ import gensim
 import spacy
 from collections import Counter, defaultdict
 from wordcloud import WordCloud
+from collections import Counter
 
 from nltk.corpus import stopwords
 from gensim.models import Word2Vec, ldamodel
@@ -159,7 +160,7 @@ def prep_data(df):
     "Function to prep data"
     data = df.copy()
 
-    data.fillna(0)  # for missing question values
+    data = data.fillna(0)  # for missing question values
     # convert value from $500 -> 500.0
     data.loc[:, 'value'] = data['value'].str[1:].str.replace(',', '').astype(np.float32)
     data.loc[:, 'air_date'] = pd.to_datetime(data.loc[:, 'air_date'])
@@ -230,7 +231,7 @@ def lemmatize(text, word_type=['NOUN', 'ADJ', 'VERB', 'ADV']):
 def lda_topics(questions, topics:int):
     id2word = gensim.corpora.Dictionary(questions)
     corpus = [id2word.doc2bow(text) for text in questions]
-    lda = ldamodel.LdaModel(corpus=corpus, id2word=id2word, topics=topics)
+    lda = ldamodel.LdaModel(corpus=corpus, id2word=id2word, num_topics=topics)
     return id2word, corpus, lda
         
     
@@ -239,7 +240,53 @@ def topic_df(lda, topics:int):
     for i in range(topics):
         words = lda.show_topic(i, topn = 15);
         words_dict[f'Topic {(i+1):2d}'] = [i[0] for i in words];
-    return pd.DataFrame(word_dict)
+    return pd.DataFrame(words_dict)
+
+
+def most_likely(corpus, lda):
+    most_likely_topic=[]
+    for doc in corpus:
+        likelihoods = dict(lda.get_document_topics(doc))
+        most_likely_topic.append(max(likelihoods,key=likelihoods.get))
+    return most_likely_topic
+
+
+def top_ic(df):
+    dfs = [x for _, x in df.groupby('round')]
+    num_topics = len(df['topic'].unique())
+    top_topics=[]
+    for df in dfs[:-1]:
+        topic_counts = [0]*num_topics
+        for topic in df['topic']:
+            topic_counts[topic]+=1
+        topics_perc = [count/sum(topic_counts) for count in topic_counts]
+        top_topics.append((-np.array(topics_perc)).argsort()[:5])
+    return top_topics
+    
+
+def plot_distributions(df):
+    year_idx = []
+    rows = 7
+    cols = 4
+    years = {i:[0]*20 for i in range(1984,2013)}
+    for i, row in df.iterrows():
+        topic = years[row['year']]
+        topic[row['topic']]+=1
+        years[row['year']] = topic
+    for year in years:
+        years[year] = [count/sum(years[year]) for count in years[year]]
+        idx = (-np.array(years[year])).argsort()[:5]
+        year_idx.append(idx)
+    fig, axs = plt.subplots(7,4,figsize=(22,12))
+    index= 0
+    years = list(d.keys())
+    for r in range(rows):
+        for c in range(cols):
+            axs[r,c].bar(range(20), years[years[index]])
+            axs[r,c].set_title(years[index])
+            axs[r,c].set_ylim([0.0, 0.14])
+            index +=1
+    return year_idx
     
 def get_topic_word_counts(df, vocab, tfidf_matrix, verbose=False):
     '''

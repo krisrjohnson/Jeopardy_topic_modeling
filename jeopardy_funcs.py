@@ -10,11 +10,14 @@ import matplotlib.pyplot as plt
 import nltk
 import re
 import time
+import string
+import gensim
+import spacy
 from collections import Counter, defaultdict
 from wordcloud import WordCloud
 
 from nltk.corpus import stopwords
-from gensim.models import Word2Vec
+from gensim.models import Word2Vec, ldamodel
 from gensim.similarities.annoy import AnnoyIndexer
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -114,9 +117,9 @@ def get_relevancies(df, num_topics=25, top_topics=3, col='difficulty', verbose=T
     results = {}
 
     if col == 'difficulty':
-      groups = range(1,7)
+        groups = range(1,7)
     else:
-      groups = df[col].unique()
+        groups = df[col].unique()
 
     for col_val in groups:
         if verbose:
@@ -161,11 +164,13 @@ def prep_data(df):
     data.loc[:, 'value'] = data['value'].str[1:].str.replace(',', '').astype(np.float32)
     data.loc[:, 'air_date'] = pd.to_datetime(data.loc[:, 'air_date'])
     data.loc[:, 'year'] = data.loc[:, 'air_date'].dt.year
+    data.question = data.question.apply(lambda x: clean_text(x))
 
     return data
 
 
 def w2v(df):
+    '''Convert categories into Word2Vecs'''
     categories = set([i.lower() for i in df['category']])
     categories = list(categories)
     categories = [re.sub('[^a-zA-Z]', ' ', cat) for cat in categories]
@@ -182,6 +187,7 @@ def w2v(df):
 
 
 def summary(x: str, word2vec, vocabulary):
+    '''Summary of the 10 nearest similar words based on Word2Vec'''
     annoy_index = AnnoyIndexer(word2vec, 100)
     vector = vocabulary[x]
     # The instance of AnnoyIndexer we just created is passed
@@ -196,7 +202,45 @@ def summary(x: str, word2vec, vocabulary):
     for neighbor in normal_neighbors:
         print(neighbor)
 
+# adapted from:
+# https://towardsdatascience.com/topic-modeling-quora-questions-with-lda-nmf-aff8dce5e1dd        
+def clean_text(text):
+    '''Make text lowercase, remove text in square brackets, remove punctuation and remove words containing numbers.'''
+    text = text.lower()
+    text = re.sub(r'\[.*?\]', '', text)
+    text = re.sub(r'[%s]' % re.escape(string.punctuation), '', text)
+    text = re.sub(r'\w*\d\w*', '', text)
+    return text
 
+
+def tokenize(questions:list):
+    for question in questions:
+        yield(gensim.utils.simple_preprocess(str(question)))
+        
+        
+def lemmatize(text, word_type=['NOUN', 'ADJ', 'VERB', 'ADV']):
+    nlp = spacy.load('en_core_web_sm', disable=['parser', 'ner'])
+    out_text = []
+    for sentence in text:
+        doc = nlp(" ".join(sentence)) 
+        out_text.append([token.lemma_ if token.lemma_ not in ['-PRON-'] else '' for token in doc if token.pos_ in word_type and token.text not in stopwords.words('english')])
+    return out_text
+
+
+def lda_topics(questions, topics:int):
+    id2word = gensim.corpora.Dictionary(questions)
+    corpus = [id2word.doc2bow(text) for text in questions]
+    lda = ldamodel.LdaModel(corpus=corpus, id2word=id2word, topics=topics)
+    return id2word, corpus, lda
+        
+    
+def topic_df(lda, topics:int):
+    words_dict = {};
+    for i in range(topics):
+        words = lda.show_topic(i, topn = 15);
+        words_dict[f'Topic {(i+1):2d}'] = [i[0] for i in words];
+    return pd.DataFrame(word_dict)
+    
 def get_topic_word_counts(df, vocab, tfidf_matrix, verbose=False):
     '''
     # Given original dataframe with topics column, vocab, and sparse matrix
